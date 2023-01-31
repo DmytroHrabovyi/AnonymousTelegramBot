@@ -32,8 +32,8 @@ def ask_question(message):
 def answer_question(message):
     connection = connection_manager.get_connection(message.chat.id)
     if connection is not None:
-        question_manager.set_answer(connection.users, message.chat.id, message.text[8:])
-        question_manager.send_answers(connection.users)
+        question_manager.set_answer(connection, message.chat.id, message.text[8:])
+        question_manager.send_answers(connection)
 
 
 @bot.message_handler(commands=['questionInfo'])
