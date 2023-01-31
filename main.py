@@ -31,9 +31,14 @@ def ask_question(message):
 @bot.message_handler(commands=['answer'])
 def answer_question(message):
     connection = connection_manager.get_connection(message.chat.id)
+    if connection is not None:
+        question_manager.set_answer(connection.users, message.chat.id, message.text[8:])
+        question_manager.send_answers(connection.users)
 
-    question_manager.set_answer(connection, message.chat.id, message.text[8:])
-    question_manager.send_answers(connection.users)
+
+@bot.message_handler(commands=['questionInfo'])
+def question_info(message):
+    bot.send_message(message.chat.id, bot_messages['question_info'], parse_mode='markdown')
 
 
 # Передаємо месседж хендлеру усі можливі типи, щоб пересилались стікери, фото і т.д.
@@ -84,8 +89,8 @@ def __init_dialogue_state():
     def message_handler(message, state_machine):
         if message.text == markup_commands['stop_dialogue']:
             connection_manager.disconnect_user(state_machine.chat.id)
-        # elif message.text == markup_commands['ask_question']:
-        #     bot.send_message(message.chat.id, bot_messages['write_question'])
+        elif message.text == markup_commands['ask_question']:
+            bot.send_message(message.chat.id, bot_messages['question_guide'], parse_mode='markdown')
         else:
             connection = connection_manager.get_connection(message.chat.id)
             if connection is not None:
