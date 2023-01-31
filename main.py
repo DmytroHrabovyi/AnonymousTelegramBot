@@ -5,58 +5,35 @@ from connection_manager import ConnectionManager
 from api_key import API_KEY
 from question_manager import QuestionManager
 from text_messages import bot_messages, markup_commands
+from content_types import content_types
 
 
 bot = telebot.TeleBot(API_KEY)
-question_manager = QuestionManager()
+question_manager = QuestionManager(bot)
 connection_manager = ConnectionManager()
 keyboard = Keyboard(bot)
 user_current_state = {}
-content_types = [
-    'text', 'photo', 'document', 'sticker', 'audio', 'voice', 'video', 'video_note',
-    'contact', 'dice', 'game', 'poll', 'invoice', 'pinned_message',
-    'successful_payment', 'connected_website', 'location', 'venue', 'animation'
-]
-
-
-@bot.message_handler(commands=['ask'])
-def ask_question(message):
-    connection = connection_manager.get_connection(message.chat.id)
-    text = message.text[5:]
-    if connection is None:
-        return
-
-    if len(text) < 1:
-        bot.send_message(message.chat.id, bot_messages['answer_empty'])
-        return
-
-    for user in connection.users:
-        if user != message.chat.id:
-            bot.send_message(user, bot_messages['question'].format(question=text))
-
-
-@bot.message_handler(commands=['answer'])
-def answer_question(message):
-    connection = connection_manager.get_connection(message.chat.id)
-    user_message = message.text[8:]
-    if connection is None:
-        return
-
-    if len(user_message) < 1:
-        bot.send_message(message.chat.id, bot_messages['answer_empty'])
-        return
-
-    if question_manager.has_answers(connection.users):
-        for user in connection.users:
-            for user2 in connection.users:
-                if user2 != message.chat.id:
-                    bot.send_message(user, question_manager.get_answer(user2))
 
 
 @bot.message_handler(commands=['start'])
 def start_bot(message):
     if message.chat.id not in user_current_state:
         user_current_state[message.chat.id] = __init_state_machine(message.chat)
+
+
+# Хендлери що реалізовують функціонал анонімного питання
+@bot.message_handler(commands=['ask'])
+def ask_question(message):
+    connection = connection_manager.get_connection(message.chat.id)
+    question_manager.ask_question(connection, message.chat.id, message.text[5:])
+
+
+@bot.message_handler(commands=['answer'])
+def answer_question(message):
+    connection = connection_manager.get_connection(message.chat.id)
+
+    question_manager.set_answer(connection, message.chat.id, message.text[8:])
+    question_manager.send_answers(connection.users)
 
 
 # Передаємо месседж хендлеру усі можливі типи, щоб пересилались стікери, фото і т.д.
@@ -83,7 +60,6 @@ def __init_state_machine(chat):
 def __init_main_menu_state():
     def message_handler(message, state_machine):
         if message.text == markup_commands['search_dialogue']:
-            # Search dialogue
             user_current_state[state_machine.chat.id].go_to_state('search_dialogue')
 
     return State(lambda state_machine: keyboard.main_menu(state_machine.chat), message_handler, None)
@@ -94,7 +70,7 @@ def __init_search_dialogue_state():
     def message_handler(message, state_machine):
         if message.text == markup_commands['stop_search']:
             user_current_state[state_machine.chat.id].go_to_state('main_menu')
-            # connection_manager.remove_from_queue(state_machine.chat.id)
+            connection_manager.remove_from_queue(state_machine.chat.id)
 
     def enter_state(state_machine):
         keyboard.search_dialogue_menu(state_machine.chat)
@@ -108,8 +84,8 @@ def __init_dialogue_state():
     def message_handler(message, state_machine):
         if message.text == markup_commands['stop_dialogue']:
             connection_manager.disconnect_user(state_machine.chat.id)
-        elif message.text == markup_commands['ask_question']:
-            bot.send_message(message.chat.id, bot_messages['write_question'])
+        # elif message.text == markup_commands['ask_question']:
+        #     bot.send_message(message.chat.id, bot_messages['write_question'])
         else:
             connection = connection_manager.get_connection(message.chat.id)
             if connection is not None:
@@ -136,10 +112,10 @@ def on_user_disconnected(user, connection):
     for user2 in connection.users:
         if len(connection.users) < 2:
             bot.send_message(user2, bot_messages['only_user_disconnected'])
-            user_current_state[user].go_to_state('main_menu')
         else:
             bot.send_message(user2, bot_messages['one_of_users_disconnected'])
 
+    bot.send_message(user, bot_messages['chat_ended'])
     user_current_state[user].go_to_state('main_menu')
 
 

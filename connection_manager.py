@@ -3,27 +3,27 @@ from events import Events
 
 class ConnectionManager:
     def __init__(self):
-        self.users = list()
+        self.queue = list()
         self.events = Events()
         self.__connections = list()
 
     def is_empty(self):
-        return self.users == []
+        return self.queue == []
 
     def enqueue(self, user):
         if not self.is_empty():
             self.create_connection([self.dequeue(), user])
         else:
-            self.users.insert(0, user)
+            self.queue.insert(0, user)
 
     def dequeue(self):
-        return self.users.pop()
+        return self.queue.pop()
 
-    def remove_from_queue(self, item):
-        if self.is_empty() or item not in self.users:
+    def remove_from_queue(self, user):
+        if self.is_empty() or user not in self.queue:
             return
 
-        self.users.remove(item)
+        self.queue.remove(user)
 
     def create_connection(self, users: list):
         connection = Connection(users)
